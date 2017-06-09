@@ -34,6 +34,7 @@ class ExportEnv {
 
 		this.isOfflineHooked = false;
 		this.hooks = {
+			"before:package:createDeploymentArtifacts": this.assertEnvVariables.bind(this),
 			"before:offline:start:init": this.initOfflineHook.bind(this),
 			"before:offline:start": this.initOfflineHook.bind(this),
 			"before:invoke:local:invoke": this.initOfflineHook.bind(this),
@@ -103,6 +104,43 @@ class ExportEnv {
 
 			fs.writeFileSync(envFilePath, envDocument);
 		});
+	}
+
+	assertEnvVariables() {
+		this.collectEnvVars()
+		.then(() => {
+			let op = this.serverless.service.custom['export-env'];
+			let stage = this.serverless.service.provider.stage || this.options.stage;
+			let isEnabled = false;
+			if(op && op.assert) {
+				if(op.assert === false) {
+					isEnabled = false;
+				}else if(op.assert === true ) {
+					isEnabled = true;
+				} else {
+					let toCheck;
+					if(Array.isArray(op.assert )) {
+						toCheck = op.assert;
+					} else {
+						toCheck = [op.assert];
+					}
+					for(let s of toCheck) {
+						if(stage === s) {
+							isEnabled = true;
+							break;
+						}
+					}
+				}
+			}
+			if(isEnabled) {
+				for(let key in this.environmentVariables) {
+					if(!this.environmentVariables[key]) {
+						console.error(`Environmentvariable ${key} is not defined`);
+						process.exit(1);
+					}
+				}
+			}
+		})
 	}
 
 }
